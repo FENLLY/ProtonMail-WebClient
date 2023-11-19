@@ -1,50 +1,37 @@
-import { type VFC, useEffect, useMemo, useRef } from 'react';
+import { type FC, type ReactElement, useEffect, useMemo, useRef } from 'react';
 import type { List } from 'react-virtualized';
 
-import { useItems } from 'proton-pass-extension/lib/hooks/useItems';
-import { useNavigationContext } from 'proton-pass-extension/lib/hooks/useNavigationContext';
-import { useSelectItemClick } from 'proton-pass-extension/lib/hooks/useSelectItemClick';
-
-import { SortFilter } from '@proton/pass/components/Item/Filters/Sort';
-import { TypeFilter } from '@proton/pass/components/Item/Filters/Type';
 import { ItemsListItem } from '@proton/pass/components/Item/List/ItemsList.Item';
 import { VirtualList } from '@proton/pass/components/Layout/List/VirtualList';
 import { itemEq } from '@proton/pass/lib/items/item.predicates';
 import { interpolateRecentItems } from '@proton/pass/lib/items/item.utils';
+import type { ItemFilters, ItemRevisionWithOptimistic, SelectedItem } from '@proton/pass/types';
 
-import { ItemsListPlaceholder } from './ItemsListPlaceholder';
+type Props = {
+    filters: ItemFilters;
+    items: ItemRevisionWithOptimistic[];
+    selectedItem?: SelectedItem;
+    totalCount: number;
+    onFilter: (update: Partial<ItemFilters>) => void;
+    onSelect: (shareId: string, itemId: string) => void;
+    placeholder: () => ReactElement;
+};
 
-export const ItemsList: VFC = () => {
-    const { selectedItem } = useNavigationContext();
-    const onSelectItem = useSelectItemClick();
-
-    const {
-        filtering: { search, type, sort, setSort, setType },
-        filtered,
-        searched,
-        totalCount,
-    } = useItems();
-
+export const ItemsList: FC<Props> = ({ items, filters, selectedItem, onSelect, placeholder }) => {
     const listRef = useRef<List>(null);
-    useEffect(() => listRef.current?.scrollToRow(0), [type, sort]);
+
+    useEffect(() => listRef.current?.scrollToRow(0), [filters.type, filters.sort]);
 
     const { interpolation, interpolationIndexes } = useMemo(
-        () => interpolateRecentItems(filtered)(sort === 'recent'),
-        [filtered, sort]
+        () => interpolateRecentItems(items)(filters.sort === 'recent'),
+        [filters.type, filters.sort, items]
     );
 
     return (
         <>
-            {totalCount > 0 && (
-                <div className="flex flex-row flex-item-nogrow flex-item-noshrink flex-nowrap p-3 gap-1 scroll-horizontal-if-needed">
-                    <TypeFilter items={searched} value={type} onChange={setType} />
-                    <SortFilter value={sort} onChange={setSort} />
-                </div>
-            )}
-
-            {filtered.length === 0 ? (
+            {items.length === 0 ? (
                 <div className="flex flex-justify-center flex-align-items-center w-full m-auto overflow-x-auto py-3">
-                    <ItemsListPlaceholder />
+                    {placeholder()}
                 </div>
             ) : (
                 <VirtualList
@@ -61,9 +48,12 @@ export const ItemsList: VFC = () => {
                                     <div style={style} key={key}>
                                         <ItemsListItem
                                             item={item}
-                                            onClick={onSelectItem(item)}
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                onSelect(item.shareId, item.itemId);
+                                            }}
                                             id={`item-${item.shareId}-${item.itemId}`}
-                                            search={search}
+                                            search={filters.search}
                                             active={selectedItem && itemEq(selectedItem)(item)}
                                         />
                                     </div>
